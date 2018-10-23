@@ -9,16 +9,27 @@ class HomomorphicFilter:
     High-frequency filters implemented:
         butterworth
         gaussian
+
     Attributes:
         a, b: Floats used on emphasis filter:
             H = a + b*H
-
-        .
+        filter: Choose of the filter, options:
+            butterworth
+            gaussian
+            external
+        filter_params: Parameters to be used on filters:
+            butterworth:
+                filter_params[0]: Cutoff frequency
+                filter_params[1]: Order of filter
+            gaussian:
+                filter_params[0]: Cutoff frequency
     """
 
-    def __init__(self, a=0.5, b=1.5):
+    def __init__(self, a=0.5, b=1.5, filter='gaussian', filter_params=[150, 2]):
         self.a = float(a)
         self.b = float(b)
+        self.filter = filter
+        self.filter_params = filter_params
 
     # Filters
     def __butterworth_filter(self, I_shape, filter_params):
@@ -44,21 +55,11 @@ class HomomorphicFilter:
         I_filtered = (self.a + self.b * H) * I
         return I_filtered
 
-    def filter(self, I, filter_params, filter='butterworth', H=None):
+    def apply_filter(self, I, H=None):
         """
         Method to apply homormophic filter on an image
         Attributes:
             I: Single channel image
-            filter_params: Parameters to be used on filters:
-                butterworth:
-                    filter_params[0]: Cutoff frequency
-                    filter_params[1]: Order of filter
-                gaussian:
-                    filter_params[0]: Cutoff frequency
-            filter: Choose of the filter, options:
-                butterworth
-                gaussian
-                external
             H: Used to pass external filter
         """
         # Get image dtype for saving
@@ -73,11 +74,11 @@ class HomomorphicFilter:
         I_fft = np.fft.fft2(I_log)
 
         # Filters
-        if filter == 'butterworth':
-            H = self.__butterworth_filter(I_shape=I_fft.shape, filter_params=filter_params)
-        elif filter == 'gaussian':
-            H = self.__gaussian_filter(I_shape=I_fft.shape, filter_params=filter_params)
-        elif filter == 'external':
+        if self.filter == 'butterworth':
+            H = self.__butterworth_filter(I_shape=I_fft.shape, filter_params=self.filter_params)
+        elif self.filter == 'gaussian':
+            H = self.__gaussian_filter(I_shape=I_fft.shape, filter_params=self.filter_params)
+        elif self.filter == 'external':
             print('external')
             if len(H.shape) is not 2:
                 raise Exception('Invalid external filter')

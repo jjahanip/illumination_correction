@@ -151,8 +151,9 @@ except ImportError:
     imagecodecs = None
 
 # ADDED FOR ILLUMINATION CORRECTION
-from homofilter import HomomorphicFilter
 import numpy as np
+from skimage import exposure
+from homofilter import HomomorphicFilter
 
 def imread(filename, *args, **kwargs):
     """Return image data from CZI file as numpy array.
@@ -363,7 +364,7 @@ class CziFile(object):
             dtype = numpy.promote_types(dtype, directory_entry.dtype[-2:])
         return dtype
 
-    def asarray(self, resize=True, order=0, out=None, max_workers=None, illumination_correction=False):
+    def asarray(self, resize=True, order=0, out=None, max_workers=None, illumination_correction=False, args=None):
         """Return image data from file(s) as numpy array.
 
         Parameters
@@ -386,7 +387,16 @@ class CziFile(object):
         out = create_output(out, self.shape, self.dtype)
 
         if max_workers is None:
-            max_workers = multiprocessing.cpu_count() // (10/9)
+            max_workers = multiprocessing.cpu_count()
+
+        if illumination_correction:
+            if args is not None:
+                homo_filter = HomomorphicFilter(a=args.a, b=args.b, filter=args.filter,
+                                                filter_params=[args.freq, args.n])
+            else:
+                homo_filter = HomomorphicFilter(a=0.75, b=1.5)
+
+
 
         def func(directory_entry, resize=resize, order=order,
                  start=self.start, out=out):
@@ -394,13 +404,13 @@ class CziFile(object):
             subblock = directory_entry.data_segment()
             tile = subblock.data(resize=resize, order=order)
 
-            # ADDED FOR ILLUMINATION CORRECTION
-            if illumination_correction:
-                tile_shape = tile.shape
-                homo_filter = HomomorphicFilter(a=0.75, b=1.25)
-                img_filtered = homo_filter.filter(I=np.squeeze(tile), filter_params=[30, 2])
-                tile = np.reshape(img_filtered, tile_shape)
-
+            # temp for R2C4:
+            if directory_entry.start[2] - start[2] == 4:
+                # ADDED FOR ILLUMINATION CORRECTION
+                if illumination_correction:
+                    tile_shape = tile.shape
+                    img_filtered = homo_filter.apply_filter(np.squeeze(tile))
+                    tile = np.reshape(img_filtered, tile_shape)
 
             index = [slice(i-j, i-j+k) for i, j, k in
                      zip(directory_entry.start, start, tile.shape)]
