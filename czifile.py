@@ -142,8 +142,8 @@ import numpy
 from scipy.ndimage.interpolation import zoom
 
 from tifffile import (FileHandle, memmap, lazyattr, repeat_nd,
-                     product, stripnull, format_size, squeeze_axes,
-                     create_output, xml2dict, pformat)
+                      product, stripnull, format_size, squeeze_axes,
+                      create_output, xml2dict, pformat)
 
 try:
     import imagecodecs
@@ -152,8 +152,11 @@ except ImportError:
 
 # ADDED FOR ILLUMINATION CORRECTION
 import numpy as np
-from skimage import exposure
 from homofilter import HomomorphicFilter
+from skimage.morphology import disk, opening
+
+from config import args
+
 
 def imread(filename, *args, **kwargs):
     """Return image data from CZI file as numpy array.
@@ -179,6 +182,7 @@ class CziFile(object):
     All attributes are read-only.
 
     """
+
     def __init__(self, arg, multifile=True, filesize=None, detectmosaic=True):
         """Open CZI file and read header.
 
@@ -218,8 +222,8 @@ class CziFile(object):
             name, _ = match_filename(arg)
             self._fh = FileHandle(name)
             self.header = Segment(self._fh, 0).data()
-            assert(self.header.primary_file_guid == self.header.file_guid)
-            assert(self.header.file_part == 0)
+            assert (self.header.primary_file_guid == self.header.file_guid)
+            assert (self.header.file_part == 0)
 
         if self.header.update_pending:
             warnings.warn('file is pending update')
@@ -334,7 +338,7 @@ class CziFile(object):
                   if dim.dimension != 'M']
                  for directory_entry in self.filtered_subblock_directory]
         shape = numpy.max(shape, axis=0)
-        shape = tuple(int(i-j) for i, j in zip(shape, self.start[:-1]))
+        shape = tuple(int(i - j) for i, j in zip(shape, self.start[:-1]))
         dtype = self.filtered_subblock_directory[0].dtype
         sampleshape = numpy.dtype(dtype).shape
         shape = shape + (sampleshape if sampleshape else (1,))
@@ -364,7 +368,7 @@ class CziFile(object):
             dtype = numpy.promote_types(dtype, directory_entry.dtype[-2:])
         return dtype
 
-    def asarray(self, resize=True, order=0, out=None, max_workers=None, illumination_correction=False, args=None):
+    def asarray(self, resize=True, order=0, out=None, max_workers=None):
         """Return image data from file(s) as numpy array.
 
         Parameters
@@ -389,14 +393,13 @@ class CziFile(object):
         if max_workers is None:
             max_workers = multiprocessing.cpu_count()
 
-        if illumination_correction:
-            if args is not None:
-                homo_filter = HomomorphicFilter(a=args.a, b=args.b, filter=args.filter,
-                                                filter_params=[args.freq, args.n])
-            else:
-                homo_filter = HomomorphicFilter(a=0.75, b=1.5)
-
-
+        if args.mode == "Homomorphic":
+            homo_filter = HomomorphicFilter(a=args.a, b=args.b, filter=args.filter, filter_params=[args.freq, args.n])
+        elif args.mode == "Morphological_Opening":
+            selem = disk(args.disk_size)
+        else:
+            print('invalid mode: ', args.mode)
+            print("Reconstructing images without illumination correction")
 
         def func(directory_entry, resize=resize, order=order,
                  start=self.start, out=out):
@@ -404,15 +407,20 @@ class CziFile(object):
             subblock = directory_entry.data_segment()
             tile = subblock.data(resize=resize, order=order)
 
-            # temp for R2C4:
-            if directory_entry.start[2] - start[2] == 4:
-                # ADDED FOR ILLUMINATION CORRECTION
-                if illumination_correction:
-                    tile_shape = tile.shape
-                    img_filtered = homo_filter.apply_filter(np.squeeze(tile))
-                    tile = np.reshape(img_filtered, tile_shape)
+            # ADDED FOR ILLUMINATION CORRECTION
+            if args.mode == "Homomorphic":
+                # Homomorphic filter
+                tile_shape = tile.shape
+                img_filtered = homo_filter.apply_filter(np.squeeze(tile))
+                tile = np.reshape(img_filtered, tile_shape)
+            elif args.mode == "Morphological_Opening":
+                # Morphological Opening
+                tile_shape = tile.shape
+                background = opening(np.squeeze(tile), selem)
+                img_filtered = tile - background
+                tile = np.reshape(img_filtered, tile_shape)
 
-            index = [slice(i-j, i-j+k) for i, j, k in
+            index = [slice(i - j, i - j + k) for i, j, k in
                      zip(directory_entry.start, start, tile.shape)]
             try:
                 out[index] = tile
@@ -631,7 +639,7 @@ class SubBlockSegment(object):
 
         # sub / supersampling
         factors = [j / i for i, j in zip(de.stored_shape, de.shape)]
-        factors = [(int(round(f)) if abs(f-round(f)) < 0.0001 else f)
+        factors = [(int(round(f)) if abs(f - round(f)) < 0.0001 else f)
                    for f in factors]
 
         # use repeat if possible
@@ -699,7 +707,7 @@ class DirectoryEntryDV(object):
          dimensions_count,
          ) = struct.unpack('<2s4xq14xi', fh.read(32))
         fh.seek(dimensions_count * 20, 1)
-        assert(schema_type == b'DV')
+        assert (schema_type == b'DV')
         return file_position
 
     def __init__(self, fh):
@@ -905,7 +913,7 @@ class AttachmentEntryA1(object):
         """Return file position of associated Attachment segment."""
         schema_type, file_position = struct.unpack('<2s10xq', fh.read(20))
         fh.seek(108, 1)
-        assert(schema_type == b'A1')
+        assert (schema_type == b'A1')
         return file_position
 
     def __init__(self, fh):
@@ -1118,7 +1126,7 @@ CONTENT_FILE_TYPE = {
     'CZEXP': read_xml,  # Experiment
     'CZHWS': read_xml,  # HardwareSetting
     'CZMVM': read_xml,  # MultiviewMicroscopy
-    'CZFBMX': read_xml, # FiberMatrix
+    'CZFBMX': read_xml,  # FiberMatrix
     # 'CZPML': PalMoleculeList,  # undocumented
     # 'ZIP'
     # 'JPG'
@@ -1138,7 +1146,6 @@ PIXEL_TYPE = {
     12: '<i4', 'Gray32': '<i4', '<i4': 'Gray32',
     13: '<i8', 'Gray64': '<i8', '<i8': 'Gray64',
 }
-
 
 # map dimension character to description
 DIMENSIONS = {
@@ -1241,12 +1248,14 @@ if sys.version_info[0] == 2:
         if flush:
             sys.stdout.flush()
 
+
     def bytes2str(b, encoding=None):
         """Return string from bytes."""
         return b
 else:
     basestring = str, bytes
     print_ = print
+
 
     def unicode(s, encoding='utf8'):
         """Return unicode string from bytes or unicode."""
@@ -1255,12 +1264,13 @@ else:
         except TypeError:
             return s
 
+
     def bytes2str(b, encoding='cp1252'):
         """Return unicode string from bytes."""
         return str(b, encoding)
 
-
 if __name__ == '__main__':
     import doctest
+
     numpy.set_printoptions(suppress=True, precision=5)
     doctest.testmod()

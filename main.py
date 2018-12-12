@@ -9,7 +9,7 @@ from config import args
 
 
 def main():
-
+    # Create folder to save results
     if not os.path.exists(os.path.join(args.save_dir, args.run_name)):
         os.makedirs(os.path.join(args.save_dir, args.run_name))
 
@@ -19,28 +19,24 @@ def main():
 
             with CziFile(os.path.join(args.input_dir, file)) as czi:
 
-                image = czi.asarray(illumination_correction=True, args=args)
+                image = czi.asarray()
                 image = np.squeeze(image)
 
-                # temp for R2C4
-                for i in range(4, 5):
+                for i in range(image.shape[0]):
 
-                # for i in range(image.shape[0]):
+                    # Post-Processing
+                    im = post_processing(image[i, :, :])
+
                     # stretch the histogram of the image
                     if args.stretch:
-                        final_image = rescale_histogram(image[i, :, :], percentile=(args.pLow, args.pHigh))
-                        config_name = '_'.join(
-                            (str(args.freq), str(int(args.a * 100)), str(int(args.b * 100)),
-                             str(args.pLow - int(args.pLow))[1:], str(args.pHigh - int(args.pHigh))[1:]))
-                    else:
-                        final_image = image[i, :, :]
-                        config_name = '_'.join(
-                            (str(args.freq), str(int(args.a * 100)), str(int(args.b * 100)),
-                             str(0), str(0)))
+                        im = rescale_histogram(im, percentile=(args.pLow, args.pHigh))
+                    if args.gamma_correction:
+                        im = exposure.adjust_gamma(im, args.gamma)
+
                     # save image
-                    filename = 'R{}C{}_'.format(round_idx, i) + config_name + '.tif'
+                    filename = 'R{}C{}'.format(round_idx, i) + '.tif'
                     fullname = os.path.join(args.save_dir, args.run_name, filename)
-                    imsave(fullname, final_image, bigtiff=True)
+                    imsave(fullname, im, bigtiff=True)
 
 
 if __name__ == '__main__':
