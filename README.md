@@ -2,16 +2,36 @@
 
 Illuminatin Correction Pipeline is a tool for correcting non-uniform illumination pattern from Immunohistochemistry (IHC) images taken from __"czi"__ or __"tif"__ files.
 
-# Dependencies:
+# Matlab
+Performs morphological opening on __tif__ images in a parallel manner to speed up the proces.
 
+## Arguments:
+|Argument|Discription|
+|---|---|
+|input_dir|path to the directory containing original images|
+|output_dir|path to the directory to save processed images|
+|disk_size|size of the morphological structure for morphological opening|
+
+
+# Python
+Performs morphological opening or homomorphic filter on __czi__ files.
+
+## Dependencies:
 * numpy
 * scipy
 * cython
 * matplotlib
 * scikit-image
 
-# Pipeline
-Illumination Correction Pipeline corrects images from `--input_dir` and save them in `--save_dir` under `run_name` folder.
+## Arguments:
+|Argument|Discription|
+|---|---|
+|input_dir|path to the directory containing original images|
+|save_dir|path to the directory to save processed images|
+|run_name|optional run name subdirectory in save_dir|
+|disk_size|size of the morphological structure for morphological opening|
+|mode|filtering mode: "Morphological_opening" or "Homomorphic"|
+
 
 Pipeline runs under two modes:
 1. `--mode=Morphological_opening`: Applies morphological opening using a disk with size `--disk_size` on image to extract 
