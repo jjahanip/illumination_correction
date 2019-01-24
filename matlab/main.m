@@ -5,10 +5,10 @@ input_dir = 'E:\50_plex\tif\pipeline2\registered';
 output_dir = 'E:\50_plex\tif\pipeline2\IL_corrected';
 disk_size = [20 40];   % disk size for Alternative Sequential Filtering
 
-if isempty(gcp('nocreate'))
-    myCluster = parcluster('local');
-    parpool(myCluster.NumWorkers)   
-end
+% if isempty(gcp('nocreate'))
+%     myCluster = parcluster('local');
+%     parpool(myCluster.NumWorkers)   
+% end
 
 % check if output directory exis
 if ~exist(output_dir, 'dir')
@@ -27,7 +27,7 @@ for i=1:size(image_fnames, 1)
         % create disk for morphological opening and closing
         se = strel('disk',disk_size(j));
         % Alternative Sequential filter
-        background = imlopen(background,se);
+        background = imopen(background,se);
     end
     
     % extract the background from original image
