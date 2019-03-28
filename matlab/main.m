@@ -1,14 +1,10 @@
+
 clc; clear all; close all;
 
 tic
 input_dir = 'E:\50_plex\tif\pipeline2\registered';
 output_dir = 'E:\50_plex\tif\pipeline2\IL_corrected';
 disk_size = [20 40];   % disk size for Alternative Sequential Filtering
-
-% if isempty(gcp('nocreate'))
-%     myCluster = parcluster('local');
-%     parpool(myCluster.NumWorkers)   
-% end
 
 % check if output directory exis
 if ~exist(output_dir, 'dir')

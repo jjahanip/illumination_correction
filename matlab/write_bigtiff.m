@@ -6,6 +6,7 @@ function write_bigtiff(image, name)
     setTag(t, 'ImageLength', size(image, 1))
     setTag(t, 'ImageWidth', size(image, 2))
     setTag(t, 'PlanarConfiguration', 1)
+    setTag(t,'RowsPerStrip',1)
     write(t,image);
     close(t);
 end
